@@ -1,0 +1,33 @@
+# Python кэш
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Coverage reports
+.coverage
+coverage.xml
+htmlcov/
+
+# Test results (Allure, JUnit)
+test-results/
+allure-results/
+.junit/
+test-reports/
+coverage-report/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Дополнительные файлы, которые у вас есть
+process_analysis.py  # если это не часть проекта
+run.py              # если это не часть проекта
+*.bat               # если не хотите bat-файлы

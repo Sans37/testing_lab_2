@@ -1,0 +1,29 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Установка зависимостей для PostgreSQL
+RUN apt-get update && apt-get install -y \
+    gcc \
+    postgresql-client \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Копируем requirements
+COPY requirements.txt .
+COPY requirements-test.txt .
+
+# Устанавливаем зависимости
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements-test.txt
+
+# Копируем исходный код
+COPY src/ ./src/
+COPY scripts/ ./scripts/
+COPY pytest.ini .
+COPY .env.example .env
+
+# Команда для запуска тестов
+CMD ["sh", "-c", "pytest src/tests/unit/ --alluredir=test-results/unit && \
+     pytest src/tests/integration/ --alluredir=test-results/integration && \
+     pytest src/tests/e2e/ --alluredir=test-results/e2e"]

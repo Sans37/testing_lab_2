@@ -1,0 +1,87 @@
+name: Test Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres-test:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_pass
+          POSTGRES_DB: test_nady_bakery
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5433:5432
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-test.txt
+        pip install allure-pytest
+
+    - name: Initialize test database
+      run: |
+        python scripts/init_test_db.py
+
+    - name: Run unit tests
+      run: |
+        pytest src/tests/unit/ \
+          --alluredir=test-results/unit \
+          --junitxml=test-results/unit/results.xml \
+          --cov=src --cov-report=xml:test-results/unit/coverage.xml
+      continue-on-error: false
+
+    - name: Run integration tests
+      run: |
+        pytest src/tests/integration/ \
+          --alluredir=test-results/integration \
+          --junitxml=test-results/integration/results.xml \
+          -m integration
+      continue-on-error: false
+
+    - name: Run E2E tests
+      run: |
+        pytest src/tests/e2e/ \
+          --alluredir=test-results/e2e \
+          --junitxml=test-results/e2e/results.xml \
+          -m e2e
+      continue-on-error: false
+
+    - name: Generate Allure report
+      if: always()
+      run: |
+        allure generate test-results/unit test-results/integration test-results/e2e \
+          --clean -o test-results/allure-report
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results
+        path: test-results/
+
+    - name: Cleanup test database
+      if: always()
+      run: |
+        python scripts/cleanup_test_db.py
