@@ -67,7 +67,7 @@ class ProductRepositoryImpl(ProductRepository):
         if not product_model:
             raise EntityNotFoundException("Товар", product_id)
 
-        # product_model.available = available
+        product_model.available = available
         self.db.commit()
         self.db.refresh(product_model)
         return product_model.to_entity()

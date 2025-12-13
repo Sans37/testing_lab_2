@@ -26,6 +26,8 @@ class ProductModel(Base):
     def to_entity(self):
         from src.core.entities.product import Product
         from src.core.entities.category import Category
+        from src.core.entities.ingredient import Ingredient
+        from datetime import datetime
 
         category_entity = Category(
             id=self.category.id,
@@ -35,7 +37,23 @@ class ProductModel(Base):
             updated_at=self.category.updated_at
         )
 
-        ingredients = self.ingredients or []
+        # Преобразуем JSON обратно в объекты Ingredient
+        ingredients = []
+        if self.ingredients:
+            for ing_data in self.ingredients:
+                # Парсим строки дат обратно в datetime объекты
+                created_at = datetime.fromisoformat(ing_data['created_at']) if ing_data.get(
+                    'created_at') else datetime.now()
+                updated_at = datetime.fromisoformat(ing_data['updated_at']) if ing_data.get(
+                    'updated_at') else datetime.now()
+
+                ingredients.append(Ingredient(
+                    id=ing_data['id'],
+                    name=ing_data['name'],
+                    allergen=ing_data['allergen'],
+                    created_at=created_at,
+                    updated_at=updated_at
+                ))
 
         return Product(
             id=self.id,
@@ -52,13 +70,30 @@ class ProductModel(Base):
 
     @classmethod
     def from_entity(cls, product_entity):
+        # Преобразуем ингредиенты в словари для JSON сериализации
+        ingredients_data = []
+        if product_entity.ingredients:
+            for ingredient in product_entity.ingredients:
+                # Используем метод to_dict из класса Ingredient
+                if hasattr(ingredient, 'to_dict'):
+                    ingredients_data.append(ingredient.to_dict())
+                else:
+                    # Если нет метода to_dict, создаем словарь вручную
+                    ingredients_data.append({
+                        "id": ingredient.id,
+                        "name": ingredient.name,
+                        "allergen": ingredient.allergen,
+                        "created_at": ingredient.created_at.isoformat() if ingredient.created_at else None,
+                        "updated_at": ingredient.updated_at.isoformat() if ingredient.updated_at else None
+                    })
+
         return cls(
             id=product_entity.id,
             name=product_entity.name,
             description=product_entity.description,
             price=product_entity.price,
-            category_id=product_entity.category.id,
-            ingredients=product_entity.ingredients,
+            category_id=product_entity.category.id if hasattr(product_entity.category, 'id') else product_entity.category,
+            ingredients=ingredients_data,  # Теперь это список словарей, а не объектов
             available=product_entity.available,
             image=product_entity.image
         )
