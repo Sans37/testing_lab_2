@@ -36,7 +36,6 @@ jobs:
         sudo apt-get install -y postgresql-client libpq-dev
         pip install --upgrade pip
         pip install -r requirements.txt
-        pip install -r requirements-test.txt
         pip install pytest pytest-asyncio pytest-cov allure-pytest
 
     - name: Wait for PostgreSQL
