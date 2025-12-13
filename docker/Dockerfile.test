@@ -1,29 +1,266 @@
+# Dockerfile.test
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Установка зависимостей для PostgreSQL
+# Установка системных зависимостей
 RUN apt-get update && apt-get install -y \
     gcc \
     postgresql-client \
     libpq-dev \
+    wget \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Копируем requirements
+# Создаем пользователя для безопасности
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Копируем зависимости
 COPY requirements.txt .
-COPY requirements-test.txt .
 
-# Устанавливаем зависимости
-RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install --no-cache-dir -r requirements-test.txt
+# Устанавливаем Python зависимости (удаляем requirements-test.txt, т.к. его нет)
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-# Копируем исходный код
+# Установка Allure для отчетов
+RUN wget -q https://github.com/allure-framework/allure2/releases/download/2.30.0/allure-2.30.0.tgz && \
+    tar -zxvf allure-2.30.0.tgz -C /opt/ && \
+    ln -s /opt/allure-2.30.0/bin/allure /usr/bin/allure && \
+    rm allure-2.30.0.tgz
+
+# Копируем исходный код и скрипты
 COPY src/ ./src/
 COPY scripts/ ./scripts/
 COPY pytest.ini .
 COPY .env.example .env
 
-# Команда для запуска тестов
-CMD ["sh", "-c", "pytest src/tests/unit/ --alluredir=test-results/unit && \
-     pytest src/tests/integration/ --alluredir=test-results/integration && \
-     pytest src/tests/e2e/ --alluredir=test-results/e2e"]
+# Исправляем порт в скриптах (5433 -> 5432) через sed
+RUN sed -i 's/5433/5432/g' scripts/*.py
+
+# Делаем скрипты исполняемыми
+RUN chmod +x scripts/*.py
+
+# Создаем директории для результатов тестов
+RUN mkdir -p /app/test-results/unit \
+    /app/test-results/integration \
+    /app/test-results/e2e \
+    /app/test-results/reports \
+    /app/coverage-report
+
+# Меняем владельца файлов
+RUN chown -R appuser:appuser /app
+
+# Переключаемся на непривилегированного пользователя
+USER appuser
+
+# Проверяем установку
+RUN python --version && \
+    pip --version && \
+    pytest --version || true
+
+# Скрипт для запуска тестов с очисткой и инициализацией БД
+COPY <<EOF /app/run_tests.sh
+#!/bin/bash
+set -e
+
+echo "=========================================="
+echo "🚀 ЗАПУСК ТЕСТОВ В DOCKER КОНТЕЙНЕРЕ"
+echo "=========================================="
+echo "Python: \$(python --version)"
+echo "Pytest: \$(pytest --version 2>/dev/null || echo 'not available')"
+echo "PostgreSQL Client: \$(psql --version)"
+echo "Allure: \$(allure --version 2>/dev/null || echo 'not available')"
+echo "=========================================="
+
+# Проверяем переменные окружения
+echo "🔍 Проверка переменных окружения:"
+echo "  DB_HOST: \${DB_HOST:-localhost}"
+echo "  DB_PORT: \${DB_PORT:-5432}"
+echo "  DB_USER: \${DB_USER:-test_user}"
+echo "  DB_NAME: \${DB_NAME:-test_nady_bakery}"
+echo "=========================================="
+
+# Функция для ожидания PostgreSQL
+wait_for_postgres() {
+    echo "⏳ Ожидание PostgreSQL на \${DB_HOST}:\${DB_PORT}..."
+    for i in {1..30}; do
+        if pg_isready -h "\${DB_HOST}" -p "\${DB_PORT}" -U "\${DB_USER}"; then
+            echo "✅ PostgreSQL готов!"
+            return 0
+        fi
+        echo "  Ждем... (\$i/30)"
+        sleep 2
+    done
+    echo "❌ PostgreSQL не доступен после 60 секунд ожидания"
+    return 1
+}
+
+# Функция для очистки БД
+cleanup_database() {
+    echo "🧹 Очистка тестовой БД..."
+    cd /app && python scripts/cleanup_test_db.py || echo "⚠️ Очистка БД не удалась"
+}
+
+# Функция для инициализации БД
+init_database() {
+    echo "🚀 Инициализация тестовой БД..."
+    cd /app && python scripts/init_test_db.py || echo "⚠️ Инициализация БД не удалась"
+}
+
+# Основной процесс тестирования
+main() {
+    # Ожидаем PostgreSQL
+    wait_for_postgres || exit 1
+
+    # Шаг 1: Unit тесты (не требуют БД)
+    echo ""
+    echo "1. 🧪 ЗАПУСК UNIT ТЕСТОВ"
+    echo "=========================================="
+    cd /app && python -m pytest src/tests/unit/ \
+        -v \
+        --junitxml=test-results/unit/junit.xml \
+        --cov=src \
+        --cov-report=xml:coverage-report/coverage-unit.xml \
+        --cov-report=html:coverage-report/unit \
+        --alluredir=test-results/unit \
+        || { echo "❌ Unit тесты упали"; exit 1; }
+    echo "✅ Unit тесты завершены"
+
+    # Шаг 2: Integration тесты
+    echo ""
+    echo "2. 🔗 ЗАПУСК INTEGRATION ТЕСТОВ"
+    echo "=========================================="
+    cleanup_database
+    init_database
+
+    cd /app && python -m pytest src/tests/integration/ \
+        -v \
+        -m integration \
+        --junitxml=test-results/integration/junit.xml \
+        --cov=src --cov-append \
+        --cov-report=xml:coverage-report/coverage-integration.xml \
+        --cov-report=html:coverage-report/integration \
+        --alluredir=test-results/integration \
+        || { echo "❌ Integration тесты упали"; cleanup_database; exit 1; }
+
+    cleanup_database
+    echo "✅ Integration тесты завершены"
+
+    # Шаг 3: E2E тесты
+    echo ""
+    echo "3. 🎯 ЗАПУСК E2E ТЕСТОВ"
+    echo "=========================================="
+    init_database
+
+    cd /app && python -m pytest src/tests/e2e/ \
+        -v \
+        -m e2e \
+        --junitxml=test-results/e2e/junit.xml \
+        --cov=src --cov-append \
+        --cov-report=xml:coverage-report/coverage-e2e.xml \
+        --cov-report=html:coverage-report/e2e \
+        --alluredir=test-results/e2e \
+        || { echo "❌ E2E тесты упали"; cleanup_database; exit 1; }
+
+    cleanup_database
+    echo "✅ E2E тесты завершены"
+
+    # Шаг 4: Генерация отчетов
+    echo ""
+    echo "4. 📊 ГЕНЕРАЦИЯ ОТЧЕТОВ"
+    echo "=========================================="
+    echo "📈 Генерация Allure отчетов..."
+    allure generate test-results/unit --clean -o test-results/reports/unit 2>/dev/null || echo "⚠️ Не удалось сгенерировать отчет unit"
+    allure generate test-results/integration --clean -o test-results/reports/integration 2>/dev/null || echo "⚠️ Не удалось сгенерировать отчет integration"
+    allure generate test-results/e2e --clean -o test-results/reports/e2e 2>/dev/null || echo "⚠️ Не удалось сгенерировать отчет e2e"
+
+    # Создаем index.html для навигации
+    cat > test-results/reports/index.html <<EOF2
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Reports - Nady Bakery</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        h1 { color: #333; }
+        .report { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        a { color: #007bff; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .success { color: green; }
+        .directory { font-family: monospace; background: #f5f5f5; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>📊 Test Reports - Nady Bakery</h1>
+    <p>Generated at: $(date)</p>
+
+    <div class="report">
+        <h2>📁 Available Reports:</h2>
+        <ul>
+            <li><a href="unit/index.html" target="_blank">🧪 Unit Tests Report</a></li>
+            <li><a href="integration/index.html" target="_blank">🔗 Integration Tests Report</a></li>
+            <li><a href="e2e/index.html" target="_blank">🎯 E2E Tests Report</a></li>
+        </ul>
+    </div>
+
+    <div class="report">
+        <h2>📈 Coverage Reports:</h2>
+        <p class="directory">/app/coverage-report/</p>
+        <ul>
+            <li><a href="../../coverage-report/unit/index.html" target="_blank">Unit Tests Coverage</a></li>
+            <li><a href="../../coverage-report/integration/index.html" target="_blank">Integration Tests Coverage</a></li>
+            <li><a href="../../coverage-report/e2e/index.html" target="_blank">E2E Tests Coverage</a></li>
+        </ul>
+    </div>
+
+    <div class="report">
+        <h2>📋 Directory Structure:</h2>
+        <pre class="directory">
+/app/
+├── test-results/
+│   ├── unit/          # Unit tests results
+│   ├── integration/   # Integration tests results
+│   ├── e2e/          # E2E tests results
+│   └── reports/      # Generated HTML reports
+└── coverage-report/   # Code coverage reports
+        </pre>
+    </div>
+</body>
+</html>
+EOF2
+
+    echo "✅ Отчеты сгенерированы"
+
+    # Шаг 5: Итоговая статистика
+    echo ""
+    echo "5. 📈 ИТОГОВАЯ СТАТИСТИКА"
+    echo "=========================================="
+
+    # Считаем тесты
+    echo "📊 Результаты тестирования:"
+    find test-results/ -name "junit.xml" -exec echo "  Файл: {}" \;
+
+    echo ""
+    echo "📁 Содержимое директорий:"
+    ls -la test-results/
+    ls -la coverage-report/
+
+    echo ""
+    echo "=========================================="
+    echo "🎉 ВСЕ ТЕСТЫ УСПЕШНО ЗАВЕРШЕНЫ!"
+    echo "=========================================="
+    echo "🚀 Для просмотра отчетов скопируйте их из контейнера:"
+    echo "   docker cp <container_id>:/app/test-results ./"
+    echo "   docker cp <container_id>:/app/coverage-report ./"
+    echo "=========================================="
+}
+
+# Запускаем основной процесс
+main
+EOF
+
+# Делаем скрипт исполняемым
+RUN chmod +x /app/run_tests.sh
+
+# Основная команда
+CMD ["/app/run_tests.sh"]

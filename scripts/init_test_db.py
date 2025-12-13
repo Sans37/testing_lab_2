@@ -14,7 +14,7 @@ from src.infrastructure.database.models.product_model import ProductModel
 from src.infrastructure.database.models.category_model import CategoryModel
 
 # Тестовая БД
-TEST_DATABASE_URL = "postgresql://test_user:test_pass@localhost:5433/test_nady_bakery"
+TEST_DATABASE_URL = "postgresql://test_user:test_pass@localhost:5432/test_nady_bakery"
 
 
 def init_test_database():

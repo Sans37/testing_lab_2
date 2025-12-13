@@ -10,7 +10,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sqlalchemy import create_engine
 from src.infrastructure.database.database import Base
 
-TEST_DATABASE_URL = "postgresql://test_user:test_pass@localhost:5433/test_nady_bakery"
+TEST_DATABASE_URL = "postgresql://test_user:test_pass@localhost:5432/test_nady_bakery"
 
 
 def cleanup_test_database():
