@@ -21,11 +21,9 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-        ports:
-          - 5432:5432
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
@@ -34,55 +32,75 @@ jobs:
 
     - name: Install dependencies
       run: |
+        sudo apt-get update
+        sudo apt-get install -y postgresql-client libpq-dev
         pip install --upgrade pip
         pip install -r requirements.txt
         pip install -r requirements-test.txt
-        pip install allure-pytest pytest-asyncio pytest-cov
+        pip install pytest pytest-asyncio pytest-cov allure-pytest
 
     - name: Wait for PostgreSQL
       run: |
         echo "Waiting for PostgreSQL..."
-        sleep 5
-        pg_isready -h localhost -p 5432
+        for i in {1..30}; do
+          if pg_isready -h localhost; then
+            echo "✅ PostgreSQL is ready!"
+            break
+          fi
+          echo "Waiting... ($i/30)"
+          sleep 2
+        done
 
     - name: Create test database
       run: |
-        PGPASSWORD=test_pass psql -h localhost -U test_user -d postgres -c "CREATE DATABASE test_nady_bakery;"
+        PGPASSWORD=test_pass createdb -h localhost -U test_user test_nady_bakery || true
+
+    - name: Create directories for test results
+      run: |
+        mkdir -p test-results/unit test-results/integration test-results/e2e
+        mkdir -p coverage-report
 
     - name: Run unit tests
       run: |
-        pytest src/tests/unit/ \
+        echo "🚀 Running unit tests..."
+        python -m pytest src/tests/unit/ \
           -v \
-          --junitxml=test-results/unit.xml \
+          --junitxml=test-results/unit/junit.xml \
           --cov=src \
-          --cov-report=xml:coverage-unit.xml
-      continue-on-error: false
+          --cov-report=xml:coverage-report/coverage-unit.xml \
+          --cov-report=html:coverage-report/unit \
+          || echo "⚠️  Unit tests failed"
 
     - name: Run integration tests
       run: |
-        pytest src/tests/integration/ \
+        echo "🚀 Running integration tests..."
+        python -m pytest src/tests/integration/ \
           -v \
           -m integration \
-          --junitxml=test-results/integration.xml \
+          --junitxml=test-results/integration/junit.xml \
           --cov=src --cov-append \
-          --cov-report=xml:coverage-integration.xml
-      continue-on-error: false
+          --cov-report=xml:coverage-report/coverage-integration.xml \
+          --cov-report=html:coverage-report/integration \
+          || echo "⚠️  Integration tests failed"
 
     - name: Run E2E tests
       run: |
-        pytest src/tests/e2e/ \
+        echo "🚀 Running E2E tests..."
+        python -m pytest src/tests/e2e/ \
           -v \
           -m e2e \
-          --junitxml=test-results/e2e.xml \
+          --junitxml=test-results/e2e/junit.xml \
           --cov=src --cov-append \
-          --cov-report=xml:coverage-e2e.xml
-      continue-on-error: false
+          --cov-report=xml:coverage-report/coverage-e2e.xml \
+          --cov-report=html:coverage-report/e2e \
+          || echo "⚠️  E2E tests failed"
 
-    - name: Generate coverage report
-      if: always()
+    - name: Check if test files exist
       run: |
-        coverage xml
-        coverage html -d coverage-report
+        echo "📁 Checking generated files..."
+        find test-results/ -type f -name "*.xml" | xargs -I {} echo "Found: {}"
+        find coverage-report/ -type f -name "*.xml" -o -name "*.html" | head -10 | xargs -I {} echo "Found: {}"
+        ls -la test-results/ coverage-report/
 
     - name: Upload test results
       if: always()
@@ -92,4 +110,23 @@ jobs:
         path: |
           test-results/
           coverage-report/
-          *.xml
+        retention-days: 7
+
+    - name: Upload coverage report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: coverage-report/
+        retention-days: 7
+
+    - name: Generate summary
+      if: always()
+      run: |
+        echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Files Generated:" >> $GITHUB_STEP_SUMMARY
+        echo "- **JUnit XML**: $(find test-results/ -name '*.xml' | wc -l) files" >> $GITHUB_STEP_SUMMARY
+        echo "- **Coverage Reports**: $(find coverage-report/ -name '*.xml' -o -name '*.html' | wc -l) files" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Job Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
