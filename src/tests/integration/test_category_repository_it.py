@@ -2,8 +2,12 @@ import pytest
 from sqlalchemy.orm import Session
 from src.infrastructure.database.repositories.category_repository_impl import CategoryRepositoryImpl
 from src.core.entities.category import Category
-from src.core.exceptions.repository_exceptions import DuplicateEntityException
+from src.core.exceptions.repository_exceptions import DuplicateEntityException, EntityNotFoundException
+import sys
+from pathlib import Path
 
+# Добавляем корень проекта в путь
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 @pytest.mark.integration
 class TestCategoryRepositoryIntegration:

@@ -1,15 +1,8 @@
 import pytest
-import asyncio
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
-from src.api.main import app
+from sqlalchemy.orm import Session  # изменено с AsyncSession
 from src.infrastructure.database.repositories.user_repository_impl import UserRepositoryImpl
-from src.infrastructure.database.repositories.product_repository_impl import ProductRepositoryImpl
-from src.infrastructure.database.repositories.category_repository_impl import CategoryRepositoryImpl
-from src.core.entities.user import User, UserRole
-from src.core.entities.product import Product
-from src.core.entities.category import Category
-from src.core.entities.ingredient import Ingredient
+
 
 pytestmark = pytest.mark.e2e
 
@@ -19,7 +12,7 @@ class TestCompleteOrderFlow:
     async def test_complete_order_flow_via_api(
         self,
         client: AsyncClient,
-        db_session: AsyncSession,
+        test_db_session: Session,  # изменено с db_session
         test_db_cleanup
     ):
         """
@@ -67,7 +60,7 @@ class TestCompleteOrderFlow:
         print("\n3. 🏷️  СОЗДАНИЕ КАТЕГОРИИ")
 
         # Сначала сделаем пользователя админом (в тестовых целях)
-        user_repo = UserRepositoryImpl(db_session)
+        user_repo = UserRepositoryImpl(test_db_session)  # используем test_db_session
         await user_repo.update(user["id"], {"role": "admin"})
         print(f"   ✅ Пользователь повышен до администратора")
 

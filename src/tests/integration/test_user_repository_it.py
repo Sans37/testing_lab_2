@@ -1,35 +1,15 @@
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session
 from src.infrastructure.database.repositories.user_repository_impl import UserRepositoryImpl
 from src.core.entities.user import User, UserRole
-from src.infrastructure.database.database import Base
+import sys
+from pathlib import Path
 
-
-@pytest.fixture(scope="function")
-def test_db_session():
-    """Фикстура для тестовой БД PostgreSQL"""
-    # Используем отдельную тестовую БД
-    TEST_DATABASE_URL = "postgresql://test_user:test_pass@localhost:5433/test_nady_bakery"
-
-    engine = create_engine(TEST_DATABASE_URL)
-
-    # Создаем таблицы
-    Base.metadata.create_all(engine)
-
-    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    db = TestingSessionLocal()
-
-    try:
-        yield db
-    finally:
-        db.close()
-        # Очищаем таблицы после теста
-        Base.metadata.drop_all(engine)
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 
 @pytest.fixture
-def user_repository(test_db_session):
+def user_repository(test_db_session: Session):
     return UserRepositoryImpl(test_db_session)
 
 

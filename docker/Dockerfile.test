@@ -21,7 +21,6 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY src/ ./src/
 COPY scripts/ ./scripts/
 COPY pytest.ini .
-COPY .env.example .env
 
 # Исправляем порт в скриптах (5433 -> 5432) через sed
 RUN sed -i 's/5433/5432/g' scripts/*.py
