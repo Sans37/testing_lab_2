@@ -10,6 +10,7 @@ on:
 env:
   TEST_DATABASE_URL: postgresql://test_user:test_pass@localhost:5433/test_nady_bakery
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # Форсируем использование Node.js 24
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true  # Разрешаем использовать Node.js 20 пока
 
 jobs:
   test:
@@ -81,9 +82,11 @@ jobs:
 
     - name: Integration Tests
       id: integration
-      if: always()  # Запускаем всегда, но проверяем статус unit
+      if: always()
       run: |
-        if [[ "${{ steps.unit.outcome }}" == "success" ]]; then
+        # Проверяем статус unit тестов с учетом возможного отсутствия
+        UNIT_STATUS="${{ steps.unit.outcome }}"
+        if [[ -z "$UNIT_STATUS" ]] || [[ "$UNIT_STATUS" == "skipped" ]] || [[ "$UNIT_STATUS" == "success" ]]; then
           python -m pytest src/tests/integration/ \
             -v \
             -m integration \
@@ -94,7 +97,7 @@ jobs:
             --cov-report=html:coverage-integration \
             --alluredir=allure-results/integration
         else
-          echo "⏭️ Unit tests failed, skipping integration tests"
+          echo "⏭️ Unit tests failed (status: $UNIT_STATUS), skipping integration tests"
           mkdir -p test-results
           echo "<?xml version=\"1.0\" encoding=\"utf-8\"?><testsuites><testsuite name=\"pytest\" skipped=\"1\"><testcase name=\"integration/skipped\"><skipped type=\"pytest.skip\" message=\"Unit tests failed\"/></testcase></testsuite></testsuites>" > test-results/integration.xml
           exit 0
@@ -108,9 +111,13 @@ jobs:
 
     - name: E2E Tests
       id: e2e
-      if: always()  # Запускаем всегда, но проверяем статус integration
+      if: always()
       run: |
-        if [[ "${{ steps.integration.outcome }}" == "success" ]] && [[ "${{ steps.unit.outcome }}" == "success" ]]; then
+        # Проверяем статусы предыдущих тестов
+        UNIT_STATUS="${{ steps.unit.outcome }}"
+        INT_STATUS="${{ steps.integration.outcome }}"
+        
+        if [[ "$UNIT_STATUS" != "failure" ]] && [[ "$INT_STATUS" != "failure" ]]; then
           python -m pytest src/tests/e2e/ \
             -v \
             -m e2e \
@@ -121,7 +128,7 @@ jobs:
             --cov-report=html:coverage-e2e \
             --alluredir=allure-results/e2e
         else
-          echo "⏭️ Integration or unit tests failed, skipping e2e tests"
+          echo "⏭️ Previous tests failed, skipping e2e tests"
           mkdir -p test-results
           echo "<?xml version=\"1.0\" encoding=\"utf-8\"?><testsuites><testsuite name=\"pytest\" skipped=\"1\"><testcase name=\"e2e/skipped\"><skipped type=\"pytest.skip\" message=\"Previous tests failed\"/></testcase></testsuite></testsuites>" > test-results/e2e.xml
           exit 0
@@ -151,9 +158,6 @@ jobs:
         echo "  Unit outcome: ${{ steps.unit.outcome }}"
         echo "  Integration outcome: ${{ steps.integration.outcome }}"
         echo "  E2E outcome: ${{ steps.e2e.outcome }}"
-        echo "  Unit conclusion: ${{ steps.unit.conclusion }}"
-        echo "  Integration conclusion: ${{ steps.integration.conclusion }}"
-        echo "  E2E conclusion: ${{ steps.e2e.conclusion }}"
       shell: bash {0}
 
     - name: Generate Allure Report
@@ -169,7 +173,7 @@ jobs:
       shell: bash {0}
 
     - name: Deploy Allure Report to GitHub Pages
-      if: always() && github.ref == 'refs/heads/main'
+      if: github.ref == 'refs/heads/main'
       uses: peaceiris/actions-gh-pages@v4.0.0
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -192,18 +196,13 @@ jobs:
         echo "  Integration: $INT_STATUS"
         echo "  E2E: $E2E_STATUS"
         
-        # Проверяем реальные ошибки (не skipped)
+        # Проверяем реальные ошибки
         if [[ "$UNIT_STATUS" == "failure" ]] || \
            [[ "$INT_STATUS" == "failure" ]] || \
            [[ "$E2E_STATUS" == "failure" ]]; then
           echo "❌ Некоторые тесты завершились с ошибками"
           exit 1
-        elif [[ "$UNIT_STATUS" == "skipped" ]] && \
-             [[ "$INT_STATUS" == "skipped" ]] && \
-             [[ "$E2E_STATUS" == "skipped" ]]; then
-          echo "⚠️ Все тесты пропущены"
-          exit 0
         else
-          echo "✅ Все выполненные тесты успешно пройдены"
+          echo "✅ Все тесты успешно пройдены или пропущены"
           exit 0
         fi
