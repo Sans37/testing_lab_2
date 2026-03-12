@@ -9,10 +9,15 @@ on:
 
 env:
   TEST_DATABASE_URL: postgresql://test_user:test_pass@localhost:5433/test_nady_bakery
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # Форсируем использование Node.js 24
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
 
     services:
       postgres:
@@ -134,7 +139,7 @@ jobs:
 
     - name: Deploy Allure Report to GitHub Pages
       if: always()
-      uses: peaceiris/actions-gh-pages@v4
+      uses: peaceiris/actions-gh-pages@v4.0.0
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_branch: gh-pages
