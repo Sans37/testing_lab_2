@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legacy System - WebLab#4</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            margin: 40px;
+            background: #000;
+            color: #0f0;
+        }
+        h1 {
+            color: #0f0;
+            text-shadow: 0 0 10px #0f0;
+            text-align: center;
+        }
+        .container {
+            border: 2px solid #0f0;
+            padding: 30px;
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(0, 20, 0, 0.3);
+        }
+        .blink {
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+        a {
+            color: #0ff;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+            text-shadow: 0 0 5px #0ff;
+        }
+        .warning {
+            color: #ff4444;
+            border-left: 3px solid #ff4444;
+            padding-left: 10px;
+            margin: 20px 0;
+        }
+        .download-box {
+            background: #111;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid #0f0;
+            border-radius: 5px;
+        }
+        .download-btn {
+            background: #0f0;
+            color: #000;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 0;
+            font-weight: bold;
+            border-radius: 5px;
+            display: block;
+            width: 100%;
+            transition: all 0.3s;
+        }
+        .download-btn:hover {
+            background: #0c0;
+            box-shadow: 0 0 10px #0f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 ДОСТУП К LEGACY СИСТЕМЕ</h1>
+
+        <div class="warning">
+            <p>⚠️ <strong>ВАЖНО:</strong> MPA интерфейс устарел. Используйте современный SPA.</p>
+        </div>
+
+        <h2>📦 Загрузка десктопного приложения</h2>
+        <p>Полнофункциональная десктопная версия включает:</p>
+        <ul>
+            <li>Полную интеграцию с API</li>
+            <li>Возможность работы оффлайн</li>
+            <li>Консольный/CLI интерфейс</li>
+            <li>Инструменты управления базой данных</li>
+        </ul>
+
+        <div class="download-box">
+            <p><span class="blink">$</span> wget http://localhost/downloads/legacy-app-v2.5.1.exe</p>
+            <p><span class="blink">$</span> Размер: 85.4 MB</p>
+            <p><span class="blink">$</span> SHA256: a1b2c3d4e5f678901234567890abcdef</p>
+            <p><span class="blink">$</span> Совместимость API: v1.0 - v2.0</p>
+        </div>
+
+        <button onclick="simulateDownload()" class="download-btn">
+            ⬇️ СКАЧАТЬ LEGACY APP v2.5.1
+        </button>
+
+        <div class="warning" style="margin-top: 30px;">
+            <p>⚠️ <strong>ПРЕДУПРЕЖДЕНИЕ БЕЗОПАСНОСТИ:</strong> Legacy система будет отключена 31 декабря 2025.</p>
+        </div>
+
+        <p style="margin-top: 40px; border-top: 1px solid #333; padding-top: 20px; text-align: center;">
+            <a href="/managment">← Назад к панели управления</a> |
+            <a href="/">Перейти к новому SPA →</a>
+        </p>
+    </div>
+
+    <script>
+        function simulateDownload() {
+            alert('В production это скачало бы файл legacy-app-v2.5.1.exe\nДля учебных целей используйте API по адресу /api/v2/');
+        }
+    </script>
+</body>
+</html>

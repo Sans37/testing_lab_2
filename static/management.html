@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Management Panel - WebLab#4</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 1000px;
+            overflow: hidden;
+        }
+        header {
+            background: linear-gradient(135deg, #4f46e5 0%, #7e22ce 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        h1 { font-size: 2.5rem; margin-bottom: 10px; }
+        .subtitle { opacity: 0.9; font-weight: 300; }
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            padding: 30px;
+        }
+        .card {
+            background: #f8fafc;
+            border-radius: 15px;
+            padding: 25px;
+            text-decoration: none;
+            color: #334155;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border-color: #4f46e5;
+        }
+        .icon {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            color: #4f46e5;
+        }
+        .card h3 {
+            margin-bottom: 10px;
+            color: #1e293b;
+        }
+        .card p {
+            color: #64748b;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        .api-card { background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); }
+        .legacy-card { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); }
+        .doc-card { background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); }
+        .main-card { background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); }
+        .admin-card { background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%); }
+        .status-card { background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); }
+        .reserved-card { background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%); }
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: #64748b;
+            font-size: 0.9rem;
+            border-top: 1px solid #e2e8f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 Панель управления веб-сервером</h1>
+            <p class="subtitle">WebLab#4 - Асинхронная конфигурация веб-сервера</p>
+        </header>
+
+        <div class="dashboard">
+            <a href="/" class="card main-card">
+                <div class="icon">🏠</div>
+                <h3>Главное приложение</h3>
+                <p>SPA интерфейс со статическим контентом и изображениями</p>
+            </a>
+
+            <a href="/api/v2/docs" class="card api-card">
+                <div class="icon">📚</div>
+                <h3>Документация API</h3>
+                <p>Swagger UI с полной спецификацией API и тестированием</p>
+            </a>
+
+            <a href="/legacy" class="card legacy-card">
+                <div class="icon">🕰️</div>
+                <h3>Legacy система</h3>
+                <p>Старый MPA интерфейс или загрузка десктопной версии</p>
+            </a>
+
+            <a href="/documentation" class="card doc-card">
+                <div class="icon">📄</div>
+                <h3>Документация проекта</h3>
+                <p>Readme.md файл с описанием проекта</p>
+            </a>
+
+            <a href="/admin" class="card admin-card">
+                <div class="icon">⚙️</div>
+                <h3>Админка базы данных</h3>
+                <p>Adminer интерфейс для управления базой данных</p>
+            </a>
+
+            <a href="/status" class="card status-card">
+                <div class="icon">📊</div>
+                <h3>Статус сервера</h3>
+                <p>Статистика Nginx сервера в реальном времени</p>
+            </a>
+
+            <a href="/reserved/" class="card reserved-card">
+                <div class="icon">🔒</div>
+                <h3>Зарезервированный путь</h3>
+                <p>Альтернативный путь к главному приложению</p>
+            </a>
+        </div>
+ч
+        <footer>
+            <p>Web Server v1.0 | Season 2025 | Powered by Nginx & Docker</p>
+        </footer>
+    </div>
+</body>
+</html>

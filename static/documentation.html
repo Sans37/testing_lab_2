@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Документация проекта - Nady Bakery</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 40px;
+            background: #f9f9f9;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #8b4513;
+            border-bottom: 2px solid #d4a76a;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #5a3e1b;
+            margin-top: 30px;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        code {
+            background: #f0f0f0;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: #d4a76a;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        .back-link:hover {
+            background: #8b4513;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📚 Документация проекта Nady Bakery</h1>
+        
+        <h2>WebLab#4 - Веб-сервер для маршрутизации</h2>
+        
+        <h3>Описание проекта</h3>
+        <p>Асинхронный веб-сервер для работы веб-приложения в части маршрутизации.</p>
+        
+        <h3>Технологии</h3>
+        <ul>
+            <li><strong>Веб-сервер:</strong> Nginx</li>
+            <li><strong>Backend API:</strong> FastAPI (Python)</li>
+            <li><strong>База данных:</strong> PostgreSQL</li>
+            <li><strong>Администрирование БД:</strong> Adminer</li>
+            <li><strong>Контейнеризация:</strong> Docker</li>
+        </ul>
+        
+        <h3>Маршрутизация</h3>
+        <pre>
+/               - Главная страница (SPA приложение)
+/api/v2        - REST API версии 2
+/api/v2/docs   - Swagger документация API
+/legacy        - Legacy система
+/documentation - Документация проекта
+/admin         - Админка базы данных
+/status        - Статус сервера
+/management    - Панель управления
+/reserved/     - Резервный путь
+        </pre>
+        
+        <h3>Запуск проекта</h3>
+        <pre><code>docker-compose up -d --build</code></pre>
+        
+        <p>Для более подробной информации смотрите оригинальный файл <code>readme.md</code> в папке documentation.</p>
+        
+        <a href="/" class="back-link">← Назад в главное приложение</a>
+    </div>
+</body>
+</html>

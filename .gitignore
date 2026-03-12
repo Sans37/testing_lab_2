@@ -1,20 +1,16 @@
-# Python кэш
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.pyc
-
-# Coverage reports
-.coverage
-coverage.xml
-htmlcov/
-
-# Test results (Allure, JUnit)
-test-results/
-allure-results/
-.junit/
-test-reports/
-coverage-report/
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+ENV/
 
 # IDE
 .idea/
@@ -22,12 +18,31 @@ coverage-report/
 *.swp
 *.swo
 
+# Test results
+test-results/
+coverage-report/
+allure-results/
+allure-report/
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Logs
+*.log
+logs/
+
 # Environment
 .env
 .env.local
-.env.*.local
+.env.test
 
-# Дополнительные файлы, которые у вас есть
-process_analysis.py  # если это не часть проекта
-run.py              # если это не часть проекта
-*.bat               # если не хотите bat-файлы
+# Docker
+docker/postgres-data/
+docker/test-postgres-data/
+
+# Database
+*.db
+*.sqlite3
+EOF

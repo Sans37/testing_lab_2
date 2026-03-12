@@ -1,14 +1,9 @@
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from src.infrastructure.database.models.user_model import UserModel
-from src.infrastructure.database.models.product_model import ProductModel
-from src.infrastructure.database.models.category_model import CategoryModel
 from src.infrastructure.database.repositories.user_repository_impl import UserRepositoryImpl
 from src.core.entities.user import User, UserRole
 from src.infrastructure.database.database import Base
-import uuid
-from datetime import datetime
 
 
 @pytest.fixture(scope="function")

@@ -1,5 +1,3 @@
-#version: '3.8'
-
 services:
   # Тестовая PostgreSQL
   test-db:
@@ -10,7 +8,7 @@ services:
       POSTGRES_USER: test_user
       POSTGRES_PASSWORD: test_pass
     ports:
-      - "5433:5432"  # Отличается от основной БД
+      - "5433:5432"  # Отличается от основной БД (5432)
     volumes:
       - ./init-test.sql:/docker-entrypoint-initdb.d/init.sql
       - test-postgres-data:/var/lib/postgresql/data
@@ -45,32 +43,24 @@ services:
       - ../test-results:/app/test-results
       - ../coverage-report:/app/coverage-report
       - ../allure-results:/app/allure-results
+      - ../src:/app/src
+      - ../scripts:/app/scripts
     networks:
       - test-network
     command: >
       sh -c "
-        python scripts/init_test_db.py &&
+        echo '🚀 Запуск тестов...' &&
+        echo '1. 🧪 Unit тесты' &&
         python -m pytest src/tests/unit/ -v --junitxml=test-results/unit.xml &&
+        echo '2. 🔗 Integration тесты' &&
         python scripts/cleanup_test_db.py --reset &&
         python -m pytest src/tests/integration/ -v -m integration --junitxml=test-results/integration.xml &&
+        echo '3. 🎯 E2E тесты' &&
         python scripts/cleanup_test_db.py --reset &&
         python -m pytest src/tests/e2e/ -v -m e2e --junitxml=test-results/e2e.xml &&
-        python scripts/cleanup_test_db.py
+        python scripts/cleanup_test_db.py &&
+        echo '✅ Все тесты завершены'
       "
-
-  # Allure для отчетов
-  allure:
-    image: frankescobar/allure-docker-service
-    container_name: nady-allure
-    environment:
-      CHECK_RESULTS_EVERY_SECONDS: 1
-      KEEP_HISTORY: 1
-    ports:
-      - "5050:5050"
-    volumes:
-      - ../allure-results:/app/allure-results
-    networks:
-      - test-network
 
 networks:
   test-network:

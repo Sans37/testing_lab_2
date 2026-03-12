@@ -1,321 +1,154 @@
 name: Test Pipeline
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Ручной запуск
+
+env:
+  TEST_DATABASE_URL: postgresql://test_user:test_pass@localhost:5433/test_nady_bakery
 
 jobs:
-  # Стандартные тесты (без Docker)
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ['3.11']
 
     services:
       postgres:
-        image: postgres:15
+        image: postgres:15-alpine
         env:
+          POSTGRES_DB: test_nady_bakery
           POSTGRES_USER: test_user
           POSTGRES_PASSWORD: test_pass
-          POSTGRES_DB: test_nady_bakery
+        ports:
+          - 5433:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-        ports:
-          - 5432:5432
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v3
 
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: '3.11'
+        cache: 'pip'
 
     - name: Install dependencies
       run: |
-        sudo apt-get update
-        sudo apt-get install -y postgresql-client libpq-dev
-        pip install --upgrade pip
+        python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install pytest pytest-asyncio pytest-cov pytest-xdist allure-pytest
 
     - name: Wait for PostgreSQL
       run: |
-        echo "Waiting for PostgreSQL..."
         for i in {1..30}; do
-          if pg_isready -h localhost -p 5432 -U test_user; then
-            echo "✅ PostgreSQL is ready!"
+          if PGPASSWORD=test_pass pg_isready -h localhost -p 5433 -U test_user; then
+            echo "PostgreSQL is ready"
             break
           fi
-          echo "Waiting... ($i/30)"
+          echo "Waiting for PostgreSQL... ($i/30)"
           sleep 2
         done
 
-    - name: Create test database
-      run: |
-        PGPASSWORD=test_pass createdb -h localhost -p 5432 -U test_user test_nady_bakery || true
-
-    - name: Create directories for test results
-      run: |
-        mkdir -p test-results/unit test-results/integration test-results/e2e
-        mkdir -p coverage-report
-
     - name: Initialize test database
-      run: |
-        python scripts/init_test_db.py
+      run: python scripts/init_test_db.py
 
-    - name: Run unit tests
+    - name: Unit Tests
+      id: unit
       run: |
-        echo "🚀 Running unit tests..."
         python -m pytest src/tests/unit/ \
           -v \
-          --junitxml=test-results/unit/junit.xml \
+          --junitxml=test-results/unit.xml \
           --cov=src \
-          --cov-report=xml:coverage-report/coverage-unit.xml \
-          --cov-report=html:coverage-report/unit \
-          --alluredir=test-results/unit \
-          || echo "⚠️  Unit tests failed"
+          --cov-report=xml:coverage-unit.xml \
+          --cov-report=html:coverage-unit \
+          --alluredir=allure-results/unit
+      continue-on-error: true
 
-    - name: Run integration tests
+    - name: Cleanup after unit tests
+      if: always()
+      run: python scripts/cleanup_test_db.py --reset
+
+    - name: Integration Tests
+      id: integration
+      if: steps.unit.outcome == 'success'
       run: |
-        echo "🚀 Running integration tests..."
-        if python -m pytest src/tests/integration/ \
+        python -m pytest src/tests/integration/ \
           -v \
           -m integration \
-          --junitxml=test-results/integration/junit.xml \
-          --cov=src --cov-append \
-          --cov-report=xml:coverage-report/coverage-integration.xml \
-          --cov-report=html:coverage-report/integration \
-          --alluredir=test-results/integration; then
-          echo "✅ Integration tests passed"
-        else
-          echo "❌ Integration tests failed"
-          python scripts/cleanup_test_db.py
-          exit 1
-        fi
+          --junitxml=test-results/integration.xml \
+          --cov=src \
+          --cov-append \
+          --cov-report=xml:coverage-integration.xml \
+          --cov-report=html:coverage-integration \
+          --alluredir=allure-results/integration
+      continue-on-error: true
 
-    - name: Run E2E tests
+    - name: Cleanup after integration tests
+      if: always()
+      run: python scripts/cleanup_test_db.py --reset
+
+    - name: E2E Tests
+      id: e2e
+      if: steps.integration.outcome == 'success'
       run: |
-        echo "🚀 Running E2E tests..."
-        # Переинициализируем БД для чистого E2E теста
-        python scripts/init_test_db.py
-        
-        if python -m pytest src/tests/e2e/ \
+        python -m pytest src/tests/e2e/ \
           -v \
           -m e2e \
-          --junitxml=test-results/e2e/junit.xml \
-          --cov=src --cov-append \
-          --cov-report=xml:coverage-report/coverage-e2e.xml \
-          --cov-report=html:coverage-report/e2e \
-          --alluredir=test-results/e2e; then
-          echo "✅ E2E tests passed"
-        else
-          echo "❌ E2E tests failed"
-          python scripts/cleanup_test_db.py
-          exit 1
-        fi
-        
-        python scripts/cleanup_test_db.py
+          --junitxml=test-results/e2e.xml \
+          --cov=src \
+          --cov-append \
+          --cov-report=xml:coverage-e2e.xml \
+          --cov-report=html:coverage-e2e \
+          --alluredir=allure-results/e2e
+      continue-on-error: true
 
-    - name: Generate Allure reports
+    - name: Cleanup after e2e tests
       if: always()
-      run: |
-        echo "📊 Generating Allure reports..."
-        # Устанавливаем Allure
-        wget https://github.com/allure-framework/allure2/releases/download/2.30.0/allure-2.30.0.tgz
-        tar -zxvf allure-2.30.0.tgz -C /opt/
-        ln -s /opt/allure-2.30.0/bin/allure /usr/bin/allure
-        rm allure-2.30.0.tgz
-        
-        # Генерируем отчеты
-        allure generate test-results/unit --clean -o test-results/reports/unit
-        allure generate test-results/integration --clean -o test-results/reports/integration
-        allure generate test-results/e2e --clean -o test-results/reports/e2e
+      run: python scripts/cleanup_test_db.py
 
     - name: Upload test results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v3
       with:
         name: test-results
         path: |
           test-results/
-          coverage-report/
-        retention-days: 7
+          coverage-*.xml
+          coverage-*/
+          allure-results/
 
-    - name: Generate summary
+    - name: Generate Allure Report
       if: always()
-      run: |
-        echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Files Generated:" >> $GITHUB_STEP_SUMMARY
-        echo "- **JUnit XML**: $(find test-results/ -name '*.xml' 2>/dev/null | wc -l) files" >> $GITHUB_STEP_SUMMARY
-        echo "- **Coverage Reports**: $(find coverage-report/ -name '*.xml' -o -name '*.html' 2>/dev/null | wc -l) files" >> $GITHUB_STEP_SUMMARY
-        echo "- **Allure Reports**: $(find test-results/reports/ -name '*.html' 2>/dev/null | wc -l) files" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### Job Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
-
-  # Docker тесты (отдельный job)
-  docker-test:
-    runs-on: ubuntu-latest
-    needs: test  # Зависит от успешного прохождения обычных тестов
-
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: test_user
-          POSTGRES_PASSWORD: test_pass
-          POSTGRES_DB: test_nady_bakery
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Build Docker image for tests
-      run: |
-        echo "🐳 Building Docker image..."
-        docker build -f Dockerfile.test -t bakery-tests:latest .
-        echo "✅ Docker image built"
-
-    - name: Wait for PostgreSQL
-      run: |
-        echo "⏳ Waiting for PostgreSQL..."
-        for i in {1..30}; do
-          if pg_isready -h localhost -p 5432 -U test_user; then
-            echo "✅ PostgreSQL is ready!"
-            break
-          fi
-          echo "Waiting... ($i/30)"
-          sleep 2
-        done
-
-    - name: Create directories for Docker results
-      run: |
-        mkdir -p docker-test-results docker-coverage-report
-
-    - name: Run tests in Docker container
-      env:
-        DB_HOST: localhost
-        DB_PORT: 5432
-        DB_USER: test_user
-        DB_PASSWORD: test_pass
-        DB_NAME: test_nady_bakery
-      run: |
-        echo "🚀 Running tests in Docker container..."
-        
-        # Запускаем контейнер с тестами
-        docker run --name bakery-tests-container \
-          --network host \
-          -e DB_HOST=localhost \
-          -e DB_PORT=5432 \
-          -e DB_USER=test_user \
-          -e DB_PASSWORD=test_pass \
-          -e DB_NAME=test_nady_bakery \
-          -e PYTHONPATH=/app/src \
-          -v $(pwd)/docker-test-results:/app/test-results \
-          -v $(pwd)/docker-coverage-report:/app/coverage-report \
-          bakery-tests:latest || echo "⚠️ Tests completed with status: $?"
-        
-        # Копируем результаты даже если тесты упали
-        echo "📋 Copying test results from container..."
-        docker cp bakery-tests-container:/app/test-results ./docker-test-results/ 2>/dev/null || echo "⚠️ Could not copy test results"
-        docker cp bakery-tests-container:/app/coverage-report ./docker-coverage-report/ 2>/dev/null || echo "⚠️ Could not copy coverage results"
-        
-        # Удаляем контейнер
-        docker rm bakery-tests-container 2>/dev/null || echo "⚠️ Could not remove container"
-
-    - name: Generate Allure reports from Docker
-      if: always()
-      run: |
-        echo "📊 Generating Allure reports from Docker results..."
-        
-        # Устанавливаем Allure
-        wget https://github.com/allure-framework/allure2/releases/download/2.30.0/allure-2.30.0.tgz
-        tar -zxvf allure-2.30.0.tgz -C /opt/
-        ln -s /opt/allure-2.30.0/bin/allure /usr/bin/allure
-        rm allure-2.30.0.tgz
-        
-        # Генерируем отчеты если есть результаты
-        if [ -d "docker-test-results/unit" ]; then
-          allure generate docker-test-results/unit --clean -o docker-test-results/reports/unit
-        fi
-        
-        if [ -d "docker-test-results/integration" ]; then
-          allure generate docker-test-results/integration --clean -o docker-test-results/reports/integration
-        fi
-        
-        if [ -d "docker-test-results/e2e" ]; then
-          allure generate docker-test-results/e2e --clean -o docker-test-results/reports/e2e
-        fi
-
-    - name: Upload Docker test results
-      if: always()
-      uses: actions/upload-artifact@v4
+      uses: simple-elf/allure-report-action@master
       with:
-        name: docker-test-results
-        path: |
-          docker-test-results/
-          docker-coverage-report/
-        retention-days: 7
+        allure_results: allure-results
+        allure_report: allure-report
+        gh_pages: gh-pages
+        allure_history: allure-history
 
-    - name: Generate Docker test summary
+    - name: Deploy Allure Report to GitHub Pages
+      if: always()
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_branch: gh-pages
+        publish_dir: allure-history
+        destination_dir: allure-history
+
+    - name: Check test status
       if: always()
       run: |
-        echo "## Docker Test Results" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        
-        if [ -d "docker-test-results" ]; then
-          echo "### 📊 Test Results from Docker Container:" >> $GITHUB_STEP_SUMMARY
-          
-          # Считаем файлы
-          unit_tests=$(find docker-test-results/reports/unit -name '*.html' 2>/dev/null | wc -l || echo "0")
-          integration_tests=$(find docker-test-results/reports/integration -name '*.html' 2>/dev/null | wc -l || echo "0")
-          e2e_tests=$(find docker-test-results/reports/e2e -name '*.html' 2>/dev/null | wc -l || echo "0")
-          
-          echo "- **Unit Tests**: $unit_tests report files" >> $GITHUB_STEP_SUMMARY
-          echo "- **Integration Tests**: $integration_tests report files" >> $GITHUB_STEP_SUMMARY
-          echo "- **E2E Tests**: $e2e_tests report files" >> $GITHUB_STEP_SUMMARY
-          
-          # Показываем структуру результатов
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📁 Results Structure:" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          find docker-test-results/ -type f -name "*.xml" -o -name "*.json" 2>/dev/null | head -20 | xargs -I {} echo "  {}" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+        if [[ "${{ steps.unit.outcome }}" == "failure" ]] || \
+           [[ "${{ steps.integration.outcome }}" == "failure" ]] || \
+           [[ "${{ steps.e2e.outcome }}" == "failure" ]]; then
+          echo "❌ Тесты завершились с ошибками"
+          exit 1
         else
-          echo "⚠️ No Docker test results found" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Все тесты успешно пройдены"
         fi
-        
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 🐳 Docker Status:" >> $GITHUB_STEP_SUMMARY
-        echo "- **Image**: bakery-tests:latest" >> $GITHUB_STEP_SUMMARY
-        echo "- **Database**: PostgreSQL 15" >> $GITHUB_STEP_SUMMARY
-        echo "- **Network**: host mode" >> $GITHUB_STEP_SUMMARY
-
-  # Заключительный шаг
-  summary:
-    runs-on: ubuntu-latest
-    needs: [test, docker-test]
-    if: always()
-
-    steps:
-    - name: Generate final summary
-      run: |
-        echo "## 🎯 Final Test Pipeline Summary" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### ✅ Jobs Status:" >> $GITHUB_STEP_SUMMARY
-        echo "- **Standard Tests**: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Docker Tests**: ${{ needs.docker-test.result }}" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 📊 Artifacts Generated:" >> $GITHUB_STEP_SUMMARY
-        echo "1. **test-results** - JUnit XML, Allure reports, coverage data" >> $GITHUB_STEP_SUMMARY
-        echo "2. **docker-test-results** - Same but from Docker container" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "### 🚀 Pipeline completed at: $(date)" >> $GITHUB_STEP_SUMMARY
