@@ -163,14 +163,27 @@ jobs:
     - name: Generate Allure Report
       if: always()
       run: |
+        # Устанавливаем allure командной строки
+        npm install -g allure-commandline --silent
+
         if [ -d "allure-results" ] && [ "$(ls -A allure-results 2>/dev/null)" ]; then
           echo "📊 Generating Allure report..."
-          npx allure generate allure-results --clean -o allure-report || echo "⚠️ Allure generation failed but continuing"
+          allure generate allure-results --clean -o allure-report
         else
           echo "📊 No allure results to generate"
           mkdir -p allure-report
         fi
       shell: bash {0}
+
+    - name: Deploy Allure Report to GitHub Pages
+      if: github.ref == 'refs/heads/main'
+      uses: peaceiris/actions-gh-pages@v4.0.0
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_branch: gh-pages
+        publish_dir: ./allure-report
+        destination_dir: allure-history
+        keep_files: true
 
     - name: Deploy Allure Report to GitHub Pages
       if: github.ref == 'refs/heads/main'
