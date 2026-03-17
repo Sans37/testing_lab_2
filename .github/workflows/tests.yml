@@ -5,12 +5,13 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:  # Ручной запуск
+  workflow_dispatch:
 
 env:
   TEST_DATABASE_URL: postgresql://test_user:test_pass@localhost:5433/test_nady_bakery
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true  # Форсируем использование Node.js 24
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true  # Разрешаем использовать Node.js 20 пока
+  DATABASE_URL: postgresql://test_user:test_pass@localhost:5433/test_nady_bakery
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
 jobs:
   test:
@@ -84,7 +85,6 @@ jobs:
       id: integration
       if: always()
       run: |
-        # Проверяем статус unit тестов с учетом возможного отсутствия
         UNIT_STATUS="${{ steps.unit.outcome }}"
         if [[ -z "$UNIT_STATUS" ]] || [[ "$UNIT_STATUS" == "skipped" ]] || [[ "$UNIT_STATUS" == "success" ]]; then
           python -m pytest src/tests/integration/ \
@@ -97,10 +97,9 @@ jobs:
             --cov-report=html:coverage-integration \
             --alluredir=allure-results/integration
         else
-          echo "⏭️ Unit tests failed (status: $UNIT_STATUS), skipping integration tests"
+          echo "⏭️ Unit tests failed, skipping integration tests"
           mkdir -p test-results
           echo "<?xml version=\"1.0\" encoding=\"utf-8\"?><testsuites><testsuite name=\"pytest\" skipped=\"1\"><testcase name=\"integration/skipped\"><skipped type=\"pytest.skip\" message=\"Unit tests failed\"/></testcase></testsuite></testsuites>" > test-results/integration.xml
-          exit 0
         fi
       shell: bash {0}
       continue-on-error: true
@@ -109,31 +108,27 @@ jobs:
       if: always()
       run: python scripts/cleanup_test_db.py --reset
 
+    - name: Start API server for E2E tests
+      if: steps.unit.outcome != 'failure' && steps.integration.outcome != 'failure'
+      run: |
+        uvicorn src.api.main:app --host 0.0.0.0 --port 8000 &
+        sleep 5
+        curl --retry 5 --retry-delay 2 --retry-connrefused http://localhost:8000/health
+      shell: bash {0}
+
     - name: E2E Tests
       id: e2e
-      if: always()
+      if: steps.unit.outcome != 'failure' && steps.integration.outcome != 'failure'
       run: |
-        # Проверяем статусы предыдущих тестов
-        UNIT_STATUS="${{ steps.unit.outcome }}"
-        INT_STATUS="${{ steps.integration.outcome }}"
-        
-        if [[ "$UNIT_STATUS" != "failure" ]] && [[ "$INT_STATUS" != "failure" ]]; then
-          python -m pytest src/tests/e2e/ \
-            -v \
-            -m e2e \
-            --junitxml=test-results/e2e.xml \
-            --cov=src \
-            --cov-append \
-            --cov-report=xml:coverage-e2e.xml \
-            --cov-report=html:coverage-e2e \
-            --alluredir=allure-results/e2e
-        else
-          echo "⏭️ Previous tests failed, skipping e2e tests"
-          mkdir -p test-results
-          echo "<?xml version=\"1.0\" encoding=\"utf-8\"?><testsuites><testsuite name=\"pytest\" skipped=\"1\"><testcase name=\"e2e/skipped\"><skipped type=\"pytest.skip\" message=\"Previous tests failed\"/></testcase></testsuite></testsuites>" > test-results/e2e.xml
-          exit 0
-        fi
-      shell: bash {0}
+        python -m pytest src/tests/e2e/ \
+          -v \
+          -m e2e \
+          --junitxml=test-results/e2e.xml \
+          --cov=src \
+          --cov-append \
+          --cov-report=xml:coverage-e2e.xml \
+          --cov-report=html:coverage-e2e \
+          --alluredir=allure-results/e2e
       continue-on-error: true
 
     - name: Cleanup after e2e tests
@@ -151,21 +146,10 @@ jobs:
           coverage-*/
           allure-results/
 
-    - name: Debug outcomes
-      if: always()
-      run: |
-        echo "📊 Статусы тестов:"
-        echo "  Unit outcome: ${{ steps.unit.outcome }}"
-        echo "  Integration outcome: ${{ steps.integration.outcome }}"
-        echo "  E2E outcome: ${{ steps.e2e.outcome }}"
-      shell: bash {0}
-
     - name: Generate Allure Report
       if: always()
       run: |
-        # Устанавливаем allure командной строки
         npm install -g allure-commandline --silent
-
         if [ -d "allure-results" ] && [ "$(ls -A allure-results 2>/dev/null)" ]; then
           echo "📊 Generating Allure report..."
           allure generate allure-results --clean -o allure-report
@@ -185,21 +169,10 @@ jobs:
         destination_dir: allure-history
         keep_files: true
 
-    - name: Deploy Allure Report to GitHub Pages
-      if: github.ref == 'refs/heads/main'
-      uses: peaceiris/actions-gh-pages@v4.0.0
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_branch: gh-pages
-        publish_dir: ./allure-report
-        destination_dir: allure-history
-        keep_files: true
-
     - name: Check test status
       if: always()
       shell: bash {0}
       run: |
-        # Собираем статусы
         UNIT_STATUS="${{ steps.unit.outcome }}"
         INT_STATUS="${{ steps.integration.outcome }}"
         E2E_STATUS="${{ steps.e2e.outcome }}"
@@ -209,13 +182,12 @@ jobs:
         echo "  Integration: $INT_STATUS"
         echo "  E2E: $E2E_STATUS"
         
-        # Проверяем реальные ошибки
         if [[ "$UNIT_STATUS" == "failure" ]] || \
            [[ "$INT_STATUS" == "failure" ]] || \
            [[ "$E2E_STATUS" == "failure" ]]; then
           echo "❌ Некоторые тесты завершились с ошибками"
           exit 1
         else
-          echo "✅ Все тесты успешно пройдены или пропущены"
+          echo "✅ Все тесты успешно пройдены"
           exit 0
         fi
