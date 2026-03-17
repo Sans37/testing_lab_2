@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: test_user
       POSTGRES_PASSWORD: test_pass
     ports:
-      - "5432:5432"  # ИЗМЕНЕНО: было 5433:5432, теперь 5432:5432
+      - "5432:5432"
     volumes:
       - ./init-test.sql:/docker-entrypoint-initdb.d/init.sql
       - test-postgres-data:/var/lib/postgresql/data
@@ -23,6 +23,28 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  test-api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    container_name: nady-test-api
+    environment:
+      DATABASE_URL: postgresql://test_user:test_pass@test-db:5432/test_nady_bakery
+      APP_ENV: test  # <-- ДОБАВЛЕНО
+      APP_INSTANCE: test-api
+      DB_ROLE: master
+      READ_ONLY: "false"
+      JWT_SECRET_KEY: test-secret-key
+      JWT_ALGORITHM: HS256
+    ports:
+      - "8000:8000"
+    depends_on:
+      test-db:
+        condition: service_healthy
+    networks:
+      - test-network
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+
   test-runner:
     build:
       context: ..
@@ -30,15 +52,17 @@ services:
     container_name: nady-test-runner
     environment:
       TEST_DATABASE_URL: "postgresql://test_user:test_pass@test-db:5432/test_nady_bakery"
+      APP_ENV: test  # <-- ДОБАВЛЕНО
+      API_URL: "http://test-api:8000"
       DB_HOST: test-db
       DB_PORT: 5432
       DB_USER: test_user
       DB_PASSWORD: test_pass
       DB_NAME: test_nady_bakery
-      PYTHONPATH: /appc
+      PYTHONPATH: /app
     depends_on:
-      test-db:
-        condition: service_healthy
+      test-api:
+        condition: service_started
     volumes:
       - ../test-results:/app/test-results
       - ../coverage-report:/app/coverage-report
@@ -57,6 +81,8 @@ services:
         python -m pytest src/tests/integration/ -v -m integration --junitxml=test-results/integration.xml &&
         echo '3. 🎯 E2E тесты' &&
         python scripts/cleanup_test_db.py --reset &&
+        # Ждем пока API полностью запустится
+        sleep 5 &&
         python -m pytest src/tests/e2e/ -v -m e2e --junitxml=test-results/e2e.xml &&
         python scripts/cleanup_test_db.py &&
         echo '✅ Все тесты завершены'

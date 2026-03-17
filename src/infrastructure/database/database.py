@@ -18,12 +18,26 @@ load_dotenv()
 DB_ROLE = os.getenv("DB_ROLE", "master")
 APP_INSTANCE = os.getenv("APP_INSTANCE", "unknown")
 READ_ONLY = os.getenv("READ_ONLY", "false").lower() == "true"
+APP_ENV = os.getenv("APP_ENV", "production")  # Добавляем определение окружения
 
 # URL для master и replica баз данных
-MASTER_DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://nady_user:f6whs7ez@db-master:5432/nady_bakery"
-)
+# Для тестового окружения используем test-db, для продакшена - db-master
+if APP_ENV == "test":
+    # В тестовом окружении используем переменную или значение по умолчанию для тестов
+    MASTER_DATABASE_URL = os.getenv(
+        "DATABASE_URL",
+        "postgresql://test_user:test_pass@test-db:5432/test_nady_bakery"
+    )
+else:
+    # В продакшене используем переменную или значение по умолчанию для продакшена
+    MASTER_DATABASE_URL = os.getenv(
+        "DATABASE_URL",
+        "postgresql://nady_user:f6whs7ez@db-master:5432/nady_bakery"
+    )
+
+logger.info(f"🔍 APP_ENV: {APP_ENV}")
+logger.info(f"🔍 DATABASE_URL from env: {os.getenv('DATABASE_URL')}")
+logger.info(f"🔍 MASTER_DATABASE_URL: {MASTER_DATABASE_URL}")
 
 REPLICA_DATABASE_URL = os.getenv(
     "REPLICA_DB_URL",
