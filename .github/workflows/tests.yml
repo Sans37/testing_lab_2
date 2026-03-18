@@ -146,22 +146,23 @@ jobs:
           coverage-*/
           allure-results/
 
-    - name: Get Allure history from gh-pages
-      if: always() && github.ref == 'refs/heads/main'
-      uses: actions/checkout@v4
-      with:
-        ref: gh-pages
-        path: gh-pages
-      continue-on-error: true
-
-    - name: Copy Allure history for trends
+    - name: Get Allure history for trends
       if: always() && github.ref == 'refs/heads/main'
       run: |
-        if [ -d "gh-pages/history" ]; then
-          echo "📂 Found allure history, copying for trends..."
-          cp -r gh-pages/history allure-results/history
+        if git ls-remote --exit-code --heads origin gh-pages > /dev/null 2>&1; then
+          echo "📂 gh-pages branch exists, fetching history..."
+          git fetch origin gh-pages --depth=1
+          mkdir -p gh-pages
+          git worktree add gh-pages origin/gh-pages
+          if [ -d "gh-pages/history" ]; then
+            echo "📂 Found allure history, copying for trends..."
+            cp -r gh-pages/history allure-results/history
+          else
+            echo "📂 No history folder yet"
+          fi
+          git worktree remove gh-pages --force
         else
-          echo "📂 No allure history found, first run"
+          echo "📂 gh-pages branch does not exist yet, skipping history (first run)"
         fi
       continue-on-error: true
 
