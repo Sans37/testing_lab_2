@@ -1,6 +1,0 @@
-🔌 Подключение к БД: postgresql://test_user:test_pass@localhost:5433/test_nady_bakery
-🔧 UserRepositoryImpl.create: создание пользователя delete@example.com
-✅ Дубликатов нет
-🔧 Модель создана: user_709108d8-de97-4e6d-916e-7e8019e918f4
-✅ Пользователь сохранен в БД
-✅ Сущность преобразована: user_709108d8-de97-4e6d-916e-7e8019e918f4
