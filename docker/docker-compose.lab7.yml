@@ -1,0 +1,70 @@
+#version: '3.8'
+
+services:
+  lab7-db:
+    image: postgres:15-alpine
+    container_name: nady-lab7-db
+    environment:
+      POSTGRES_DB: test_nady_bakery
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_pass
+    ports:
+      - "5434:5432"
+    volumes:
+      - ./init-test.sql:/docker-entrypoint-initdb.d/init.sql
+      - lab7-postgres-data:/var/lib/postgresql/data
+    networks:
+      - lab7-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d test_nady_bakery"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  mock-external:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    container_name: nady-lab7-mock-external
+    environment:
+      APP_ENV: demo
+    ports:
+      - "8081:8081"
+    networks:
+      - lab7-network
+    command: uvicorn src.mock_external_service:app --host 0.0.0.0 --port 8081
+
+  lab7-api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    container_name: nady-lab7-api
+    environment:
+      DATABASE_URL: postgresql://test_user:test_pass@lab7-db:5432/test_nady_bakery
+      APP_ENV: demo
+      APP_INSTANCE: lab7-api
+      DB_ROLE: master
+      READ_ONLY: "false"
+      JWT_SECRET_KEY: test-secret-key
+      JWT_ALGORITHM: HS256
+      EXTERNAL_SERVICE_MODE: mock
+      EXTERNAL_POSTS_BASE_URL: "http://mock-external:8081"
+    ports:
+      - "8010:8000"
+    depends_on:
+      lab7-db:
+        condition: service_healthy
+      mock-external:
+        condition: service_started
+    networks:
+      - lab7-network
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+networks:
+  lab7-network:
+    driver: bridge
+
+volumes:
+  lab7-postgres-data:

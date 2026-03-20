@@ -1,0 +1,62 @@
+﻿#version: '3.8'
+
+services:
+  benchmark-db:
+    image: postgres:15-alpine
+    container_name: nady-benchmark-db
+    mem_limit: 512m
+    cpus: "0.50"
+    environment:
+      POSTGRES_DB: test_nady_bakery
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init-test.sql:/docker-entrypoint-initdb.d/init.sql
+      - benchmark-postgres-data:/var/lib/postgresql/data
+    networks:
+      - benchmark-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d test_nady_bakery"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  benchmark-api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    container_name: nady-benchmark-api
+    mem_limit: 1024m
+    cpus: "1.00"
+    environment:
+      DATABASE_URL: postgresql://test_user:test_pass@benchmark-db:5432/test_nady_bakery
+      APP_ENV: benchmark
+      APP_INSTANCE: benchmark-api
+      DB_ROLE: master
+      READ_ONLY: "false"
+      JWT_SECRET_KEY: test-secret-key
+      JWT_ALGORITHM: HS256
+      ENABLE_TRACING: ${ENABLE_TRACING:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      OTEL_EXPORTER_FILE: /app/observability/otel_traces.jsonl
+    ports:
+      - "8000:8000"
+    depends_on:
+      benchmark-db:
+        condition: service_healthy
+    networks:
+      - benchmark-network
+    volumes:
+      - ../observability:/app/observability
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+networks:
+  benchmark-network:
+    driver: bridge
+
+volumes:
+  benchmark-postgres-data:

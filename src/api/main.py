@@ -2,14 +2,20 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 import os
 import logging
+from src.observability.tracing import setup_tracing
 
 # 👇 Добавляем этот импорт
 from src.api.v2.routers import api_router
 
-logging.basicConfig(level=logging.INFO)
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(level=getattr(logging, LOG_LEVEL, logging.INFO))
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Nady Bakery API")
+
+# Optional tracing for Lab 5
+if os.getenv("ENABLE_TRACING", "false").lower() == "true":
+    setup_tracing(app)
 
 # Middleware для проверки read-only
 @app.middleware("http")

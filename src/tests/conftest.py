@@ -1,9 +1,10 @@
-import pytest
+﻿import pytest
 import os
 from typing import Generator, AsyncGenerator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from httpx import AsyncClient, ASGITransport
+import psycopg2
 
 from src.core.entities.product import Product
 from src.core.entities.user import User
@@ -19,19 +20,61 @@ import uuid
 from src.infrastructure.database.repositories.category_repository_impl import CategoryRepositoryImpl
 from src.infrastructure.database.repositories.product_repository_impl import ProductRepositoryImpl
 from src.infrastructure.database.repositories.user_repository_impl import UserRepositoryImpl
+from sqlalchemy.engine import make_url
+
 
 # Тестовая БД
-TEST_DATABASE_URL = os.getenv(
-    "TEST_DATABASE_URL",
-    "postgresql://test_user:test_pass@localhost:5432/test_nady_bakery"
-)
+_DEFAULT_TEST_DB_URL = "postgresql://test_user:test_pass@localhost:5432/test_nady_bakery"
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", _DEFAULT_TEST_DB_URL)
+# Sanitize env value (non-breaking spaces / non-ASCII)
+TEST_DATABASE_URL = TEST_DATABASE_URL.replace("\u00A0", "").strip()
+TEST_DATABASE_URL = "".join(ch for ch in TEST_DATABASE_URL if 32 <= ord(ch) <= 126)
+try:
+    TEST_DATABASE_URL.encode("ascii")
+except Exception:
+    TEST_DATABASE_URL = _DEFAULT_TEST_DB_URL
 
 
 @pytest.fixture(scope="function")
 def test_db_session() -> Generator[Session, None, None]:
     """Фикстура для синхронной сессии БД (для всех тестов)"""
     print(f"🔌 Подключение к БД: {TEST_DATABASE_URL}")
-    engine = create_engine(TEST_DATABASE_URL)
+    # Clear libpq environment variables that may contain hidden characters
+    for key in [
+        "PGHOST",
+        "PGPORT",
+        "PGUSER",
+        "PGPASSWORD",
+        "PGDATABASE",
+        "PGSSLMODE",
+        "PGOPTIONS",
+        "PGAPPNAME",
+        "PGPASSFILE",
+        "PGSERVICE",
+        "PGSERVICEFILE",
+        "PGCLIENTENCODING",
+        "PGSSLCERT",
+        "PGSSLKEY",
+        "PGSSLROOTCERT",
+        "PGSSLCRL",
+        "PGSSLCRLDIR",
+    ]:
+        os.environ.pop(key, None)
+    # Force sane client encoding and avoid parsing .pgpass with bad bytes
+    os.environ["PGCLIENTENCODING"] = "UTF8"
+    os.environ["PGPASSFILE"] = "NUL"
+    url = make_url(TEST_DATABASE_URL)
+    def _connect():
+        return psycopg2.connect(
+            host=url.host or "localhost",
+            dbname=url.database or "test_nady_bakery",
+            user=url.username or "test_user",
+            password=url.password or "test_pass",
+            port=url.port or 5432,
+            options="-c client_encoding=UTF8",
+        )
+
+    engine = create_engine("postgresql+psycopg2://", creator=_connect)
 
     # Создаем таблицы
     Base.metadata.create_all(engine)
@@ -112,3 +155,4 @@ async def test_db_cleanup():
     yield
     # Очистка происходит автоматически в test_db_session
     pass
+

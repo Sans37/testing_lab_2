@@ -98,3 +98,12 @@ class ReviewResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# External integration DTOs
+class ExternalPostResponse(BaseModel):
+    id: int
+    user_id: int
+    title: str
+    body: str
+    source: str

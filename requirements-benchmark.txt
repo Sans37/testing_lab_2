@@ -1,0 +1,3 @@
+﻿# Optional dependencies for lab3 benchmark scripts
+matplotlib==3.9.0
+psutil==6.0.0

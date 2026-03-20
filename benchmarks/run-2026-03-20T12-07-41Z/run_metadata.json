@@ -1,0 +1,19 @@
+{
+  "run_id": "run-2026-03-20T12-07-41Z",
+  "base_url": "http://localhost:8000",
+  "trials": 100,
+  "baseline_requests": 200,
+  "baseline_concurrency": 20,
+  "max_concurrency": 150,
+  "degradation_step": 20,
+  "p95_threshold_ms": 500,
+  "error_rate_threshold": 0.05,
+  "docker_per_trial": false,
+  "compose_file": "",
+  "docker_stats": [
+    "nady-benchmark-api",
+    "nady-benchmark-db"
+  ],
+  "started_at": "2026-03-20T12:07:41.974966Z",
+  "finished_at": "2026-03-20T12:23:23.193392Z"
+}

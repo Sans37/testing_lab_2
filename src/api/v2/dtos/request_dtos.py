@@ -20,6 +20,26 @@ class UserLoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+# Two-factor DTOs
+class TwoFactorVerifyRequest(BaseModel):
+    session_id: str
+    code: str
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str
+    otp_code: str
+
+class PasswordChangeOtpRequest(BaseModel):
+    email: EmailStr
+
+class UnlockRequest(BaseModel):
+    email: EmailStr
+
+class UnlockConfirmRequest(BaseModel):
+    email: EmailStr
+    code: str
+
 # Product DTOs
 class ProductCreateRequest(BaseModel):
     name: str

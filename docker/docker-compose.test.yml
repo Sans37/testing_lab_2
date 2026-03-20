@@ -1,6 +1,19 @@
 #version: '3.8'
 
 services:
+  mock-external:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    container_name: nady-mock-external
+    environment:
+      APP_ENV: test
+    ports:
+      - "8081:8081"
+    networks:
+      - test-network
+    command: uvicorn src.mock_external_service:app --host 0.0.0.0 --port 8081
+
   test-db:
     image: postgres:15-alpine
     container_name: nady-test-db
@@ -30,17 +43,21 @@ services:
     container_name: nady-test-api
     environment:
       DATABASE_URL: postgresql://test_user:test_pass@test-db:5432/test_nady_bakery
-      APP_ENV: test  # <-- ДОБАВЛЕНО
+      APP_ENV: test
       APP_INSTANCE: test-api
       DB_ROLE: master
       READ_ONLY: "false"
       JWT_SECRET_KEY: test-secret-key
       JWT_ALGORITHM: HS256
+      EXTERNAL_SERVICE_MODE: mock
+      EXTERNAL_POSTS_BASE_URL: "http://mock-external:8081"
     ports:
       - "8000:8000"
     depends_on:
       test-db:
         condition: service_healthy
+      mock-external:
+        condition: service_started
     networks:
       - test-network
     command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
@@ -52,7 +69,9 @@ services:
     container_name: nady-test-runner
     environment:
       TEST_DATABASE_URL: "postgresql://test_user:test_pass@test-db:5432/test_nady_bakery"
-      APP_ENV: test  # <-- ДОБАВЛЕНО
+      EXTERNAL_SERVICE_MODE: mock
+      EXTERNAL_POSTS_BASE_URL: "http://mock-external:8081"
+      APP_ENV: test
       API_URL: "http://test-api:8000"
       DB_HOST: test-db
       DB_PORT: 5432
@@ -62,6 +81,8 @@ services:
       PYTHONPATH: /app
     depends_on:
       test-api:
+        condition: service_started
+      mock-external:
         condition: service_started
     volumes:
       - ../test-results:/app/test-results
@@ -73,19 +94,18 @@ services:
       - test-network
     command: >
       sh -c "
-        echo '🚀 Запуск тестов...' &&
-        echo '1. 🧪 Unit тесты' &&
+        echo 'Running tests...' &&
+        echo '1. Unit tests' &&
         python -m pytest src/tests/unit/ -v --junitxml=test-results/unit.xml &&
-        echo '2. 🔗 Integration тесты' &&
+        echo '2. Integration tests' &&
         python scripts/cleanup_test_db.py --reset &&
         python -m pytest src/tests/integration/ -v -m integration --junitxml=test-results/integration.xml &&
-        echo '3. 🎯 E2E тесты' &&
+        echo '3. E2E tests' &&
         python scripts/cleanup_test_db.py --reset &&
-        # Ждем пока API полностью запустится
         sleep 5 &&
         python -m pytest src/tests/e2e/ -v -m e2e --junitxml=test-results/e2e.xml &&
         python scripts/cleanup_test_db.py &&
-        echo '✅ Все тесты завершены'
+        echo 'All tests finished'
       "
 
 networks:

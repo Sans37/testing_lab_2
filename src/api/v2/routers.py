@@ -6,7 +6,8 @@ from .controllers import (
     categories_router,
     cart_router,
     orders_router,
-    reviews_router
+    reviews_router,
+    integrations_router,
 )
 
 # Главный роутер API v2
@@ -19,3 +20,4 @@ api_router.include_router(categories_router)
 api_router.include_router(cart_router)
 api_router.include_router(orders_router)
 api_router.include_router(reviews_router)
+api_router.include_router(integrations_router)

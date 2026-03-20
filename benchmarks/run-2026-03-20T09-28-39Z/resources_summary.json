@@ -1,0 +1,20 @@
+{
+  "nady-benchmark-api": {
+    "cpu_min": 1.93,
+    "cpu_max": 92.31,
+    "cpu_mean": 67.71803418803418,
+    "mem_min_mib": 98.11,
+    "mem_max_mib": 110.3,
+    "mem_mean_mib": 102.92358974358974,
+    "samples": 117
+  },
+  "nady-benchmark-db": {
+    "cpu_min": 0.02,
+    "cpu_max": 6.34,
+    "cpu_mean": 2.9423076923076925,
+    "mem_min_mib": 33.11,
+    "mem_max_mib": 44.89,
+    "mem_mean_mib": 36.71871794871795,
+    "samples": 117
+  }
+}
