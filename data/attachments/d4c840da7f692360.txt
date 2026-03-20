@@ -1,0 +1,3 @@
+INFO:httpx:HTTP Request: POST http://test/api/v2/auth/register "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://test/api/v2/auth/login "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST http://test/api/v2/categories/ "HTTP/1.1 201 Created"
