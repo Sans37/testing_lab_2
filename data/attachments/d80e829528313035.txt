@@ -1,0 +1,6 @@
+🔌 Подключение к БД: postgresql://test_user:test_pass@localhost:5433/test_nady_bakery
+🔧 UserRepositoryImpl.create: создание пользователя update@example.com
+✅ Дубликатов нет
+🔧 Модель создана: user_cfc056a9-02de-4d1b-97ce-99629d0999e1
+✅ Пользователь сохранен в БД
+✅ Сущность преобразована: user_cfc056a9-02de-4d1b-97ce-99629d0999e1

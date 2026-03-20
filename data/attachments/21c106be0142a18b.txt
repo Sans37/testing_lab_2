@@ -1,6 +1,0 @@
-🔌 Подключение к БД: postgresql://test_user:test_pass@localhost:5433/test_nady_bakery
-🔧 UserRepositoryImpl.create: создание пользователя update@example.com
-✅ Дубликатов нет
-🔧 Модель создана: user_dd95c29b-725c-41bb-83c6-124c5c1cf1f1
-✅ Пользователь сохранен в БД
-✅ Сущность преобразована: user_dd95c29b-725c-41bb-83c6-124c5c1cf1f1

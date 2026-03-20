@@ -1,0 +1,2 @@
+INFO     httpx:_client.py:1729 HTTP Request: GET http://localhost:8081/posts/1 "HTTP/1.1 200 OK"
+INFO     httpx:_client.py:1729 HTTP Request: GET http://test/api/v2/integrations/posts/1 "HTTP/1.1 200 OK"
