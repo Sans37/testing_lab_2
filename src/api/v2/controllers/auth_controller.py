@@ -16,6 +16,12 @@ from src.api.v2.dtos.response_dtos import AuthResponse, UserResponse
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
+def _auth_response_to_dict(resp: AuthResponse) -> dict:
+    dump = getattr(resp, "model_dump", None)
+    if callable(dump):
+        return dump()
+    return resp.dict()
+
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def register(
@@ -66,9 +72,11 @@ async def login(
                 "session_id": result["session_id"]
             }
 
-        return AuthResponse(
-            token=result["token"],
-            user=UserResponse(**result["user"].to_dict())
+        return _auth_response_to_dict(
+            AuthResponse(
+                token=result["token"],
+                user=UserResponse(**result["user"].to_dict()),
+            )
         )
     except AuthenticationException as e:
         if str(e) == "ACCOUNT_LOCKED":
